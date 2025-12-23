@@ -1,80 +1,89 @@
 "use server";
 
+import { AccountType } from "@/lib/generated/prisma";
 import { Prisma } from "@/lib/generated/prisma/client";
-import prisma from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { auth } from "@clerk/nextjs/server";
-import { revalidatePath } from "next/cache";
 
-const serializeAccount = (account: Prisma.AccountWhereInput) => {
-  return {
-    ...account,
-    balance: account.balance?.toNumber(),
-  };
-};
+interface CreateAccountInput {
+  name: string;
+  type: AccountType;
+  balance?: number;
+  isDefault?: boolean;
+  userId: string;
+}
 
-export const createAccount = async ({
-  data,
-}: {
-  data: Prisma.AccountCreateInput;
-}) => {
+export async function createAccount(data: CreateAccountInput) {
   try {
+    console.log("CreateAccount Input:", data);
     const { userId } = await auth();
-    if (!userId) throw new Error("Unauthorized");
+    if (!userId) throw new Error("unauthorized");
 
     const user = await prisma.user.findUnique({
-      where: { clerkUserId: userId },
+      where: {
+        clerkUserId: userId,
+      },
     });
 
     if (!user) throw new Error("User not found");
 
-    // ✅ Proper balance parsing
-    let balanceFloat: number;
-
-    if (typeof data.balance === "string") {
-      balanceFloat = parseFloat(data.balance);
-    } else if (typeof data.balance === "number") {
-      balanceFloat = data.balance;
-    } else {
-      throw new Error("Balance is required");
-    }
-
-    if (Number.isNaN(balanceFloat)) {
-      throw new Error("Invalid balance amount");
-    }
-
-    const existingAccounts = await prisma.account.findMany({
-      where: { userId: user.id },
-    });
-
-    const shouldBeDefault =
-      existingAccounts.length === 0 ? true : data.isDefault ?? false;
-
-    if (shouldBeDefault) {
-      await prisma.account.updateMany({
-        where: { userId: user.id, isDefault: true },
-        data: { isDefault: false },
-      });
-    }
-
     const account = await prisma.account.create({
       data: {
-        ...data,
-        balance: balanceFloat,
-        userId: user.id,
-        isDefault: shouldBeDefault,
+        name: user?.name ?? "N/A",
+        type: data.type,
+        balance: new Prisma.Decimal(data.balance ?? 0),
+        isDefault: data.isDefault ?? false,
+        userId: userId,
       },
     });
 
-    revalidatePath("/dashboard");
+    return {
+      success: true,
+      data: account,
+    };
+  } catch (error) {
+    console.error("❌ Prisma Error:", error);
+    return {
+      success: false,
+      message: error.message ?? "Failed to create account",
+    };
+  }
+}
+
+export async function fetchAccountList() {
+  try {
+    const { userId } = await auth();
+    if (!userId) throw new Error("unauthorized");
+
+    const user = await prisma.user.findUnique({
+      where: {
+        clerkUserId: userId,
+      },
+    });
+    console.log({ user, userId });
+    if (!user) throw new Error("User not found");
+
+    const account = await prisma.account.findMany({
+      where: { userId },
+      orderBy: { updateAt: "desc" },
+      include: {
+        _count: {
+          select: {
+            transactions: true,
+          },
+        },
+      },
+    });
 
     return {
       success: true,
-      data: serializeAccount(account),
+      data: account,
     };
   } catch (error) {
-    if (error instanceof Error) {
-      throw new Error(error.message);
-    }
-    throw new Error("Something went wrong");
+    console.error("Create Account Error:", error);
+    return {
+      success: false,
+      message: "Failed to create account",
+    };
   }
-};
+}

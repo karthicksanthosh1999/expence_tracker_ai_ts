@@ -1,11 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
-  provider = "prisma-client"
+  provider = "prisma-client-js"
   output   = "../lib/generated/prisma"
 }
 
@@ -19,11 +13,11 @@ model User {
   email        String
   name         String?
   imageUrl     String?
-  transactions Transactions[]
+  createAt     DateTime       @default(now())
+  updateAt     DateTime       @updatedAt
   accounts     Account[]
-  budgets      Budget[]
-  createAt     DateTime
-  updateAt     DateTime
+  budgets      Budget?
+  transactions Transactions[]
 
   @@map("users")
 }
@@ -35,18 +29,13 @@ model Account {
   balance      Decimal        @default(0)
   isDefault    Boolean        @default(false)
   userId       String
-  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  transactions Transactions[]
   createAt     DateTime       @default(now())
   updateAt     DateTime       @updatedAt
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transactions[]
 
   @@index([userId])
   @@map("accounts")
-}
-
-enum AccountType {
-  CURRENT
-  SAVINGS
 }
 
 model Transactions {
@@ -63,15 +52,33 @@ model Transactions {
   lastProcessed     DateTime?
   status            TransactionStatus  @default(COMPLETED)
   userId            String
-  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   accountId         String
-  account           Account            @relation(fields: [accountId], references: [id], onDelete: Cascade)
   createAt          DateTime           @default(now())
   updateAt          DateTime           @updatedAt
+  account           Account            @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([accountId])
   @@map("transactions")
+}
+
+model Budget {
+  id            String    @id @default(uuid())
+  amount        Decimal
+  lastAlertSend DateTime?
+  userId        String    @unique
+  createAt      DateTime  @default(now())
+  updateAt      DateTime  @updatedAt
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("budgets")
+}
+
+enum AccountType {
+  CURRENT
+  SAVINGS
 }
 
 enum TransactionsType {
@@ -90,17 +97,4 @@ enum TransactionStatus {
   PENDING
   COMPLETED
   FAILED
-}
-
-model Budget {
-  id            String    @id @default(uuid())
-  amount        Decimal
-  lastAlertSend DateTime?
-  userId        String    @unique
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createAt      DateTime  @default(now())
-  updateAt      DateTime  @updatedAt
-
-  @@index([userId])
-  @@map("budgets")
 }
