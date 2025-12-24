@@ -1,19 +1,11 @@
 "use server";
 
-import { AccountType } from "@/lib/generated/prisma";
+import { accountInputType } from "@/app/types/accountTypes";
 import { Prisma } from "@/lib/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@clerk/nextjs/server";
 
-interface CreateAccountInput {
-  name: string;
-  type: AccountType;
-  balance?: number;
-  isDefault?: boolean;
-  userId: string;
-}
-
-export async function createAccount(data: CreateAccountInput) {
+export async function createAccount(data: accountInputType) {
   try {
     console.log("CreateAccount Input:", data);
     const { userId } = await auth();
@@ -24,7 +16,7 @@ export async function createAccount(data: CreateAccountInput) {
         clerkUserId: userId,
       },
     });
-
+    console.log(user);
     if (!user) throw new Error("User not found");
 
     const account = await prisma.account.create({
@@ -33,7 +25,7 @@ export async function createAccount(data: CreateAccountInput) {
         type: data.type,
         balance: new Prisma.Decimal(data.balance ?? 0),
         isDefault: data.isDefault ?? false,
-        userId: userId,
+        userId: user?.id,
       },
     });
 
@@ -41,11 +33,12 @@ export async function createAccount(data: CreateAccountInput) {
       success: true,
       data: account,
     };
-  } catch (error) {
-    console.error("❌ Prisma Error:", error);
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Failed to create account";
     return {
       success: false,
-      message: error.message ?? "Failed to create account",
+      message,
     };
   }
 }
@@ -60,11 +53,10 @@ export async function fetchAccountList() {
         clerkUserId: userId,
       },
     });
-    console.log({ user, userId });
     if (!user) throw new Error("User not found");
 
     const account = await prisma.account.findMany({
-      where: { userId },
+      where: { userId: user?.id },
       orderBy: { updateAt: "desc" },
       include: {
         _count: {
@@ -74,7 +66,6 @@ export async function fetchAccountList() {
         },
       },
     });
-
     return {
       success: true,
       data: account,

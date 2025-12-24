@@ -49,20 +49,21 @@ const CreateAccountDrawer = ({ children }: { children: ReactNode }) => {
   } = useFetch(createAccount);
 
   useEffect(() => {
-    if (newAccount && !createAccountLoading) {
+    if (!createAccountLoading && newAccount?.success) {
       toast.success("Account created successfully");
       reset();
       setOpen(false);
     }
-  }, [createAccountLoading, newAccount]);
+  }, [newAccount, createAccountLoading]);
 
   useEffect(() => {
     if (error) {
-      console.log(error);
+      toast.error(error.message ?? "Failed to create account");
     }
   }, [error]);
 
   const onSubmit = async (data: accountSchemaType) => {
+    console.log("submit", data);
     await createAccountFn(data);
   };
 
@@ -136,7 +137,6 @@ const CreateAccountDrawer = ({ children }: { children: ReactNode }) => {
                 onCheckedChange={(checked) => setValue("isDefault", checked)}
                 checked={watch("isDefault")}></Switch>
             </div>
-
             {/* BUTTONS */}
             <div>
               <DrawerClose>

@@ -21,11 +21,11 @@ const DashboardPage = async () => {
             </CardContent>
           </Card>
         </CreateAccountDrawer>
-
-        {accountsList?.length > 0 ? (
-          accountsList.map((item, idx) => (
-            <AccountCards key={idx} account={item} />
-          ))
+        {accountsList && accountsList?.length > 0 ? (
+          accountsList.map((item, idx) => {
+            console.log(item);
+            return <AccountCards key={idx} account={item} />;
+          })
         ) : (
           <>No card found</>
         )}
