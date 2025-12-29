@@ -4,8 +4,8 @@ import { TransactionStatus, TransactionsType } from "@/lib/generated/prisma";
 import { prisma } from "@/lib/prisma";
 import { subDays } from "date-fns";
 
-const ACCOUNT_ID: string = "account-id";
-const USER_ID: string = "user-id";
+const ACCOUNT_ID: string = "66b35762-390c-41bc-9893-6e9a63388e2d";
+const USER_ID: string = "04a5e08e-6d26-4eab-8e58-45bd0deb03f4";
 
 interface CategoryConfig {
   name: string;
@@ -73,8 +73,8 @@ export async function seedTransactions() {
           status: TransactionStatus.COMPLETED, // TYPE SAFE
           userId: USER_ID,
           accountId: ACCOUNT_ID,
-          createdAt: date,
-          updatedAt: date,
+          createAt: date,
+          updateAt: date,
         };
 
         totalBalance += type === "INCOME" ? amount : -amount;
