@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { success } from "zod";
 
 export const updateDefaultAccount = async (accountId: string) => {
   try {
@@ -97,4 +98,70 @@ export const getAccountWithTransactions = async (accountId: string) => {
       })),
     },
   };
+};
+
+export const bulkDeleteTransactions = async (transactionsIds: string[]) => {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      throw new Error("User is not get");
+    }
+    const user = await prisma.user.findUnique({
+      where: {
+        clerkUserId: userId,
+      },
+    });
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const transactions = await prisma.transactions.findMany({
+      where: {
+        id: { in: transactionsIds },
+        userId: user?.id,
+      },
+    });
+
+    const accountBalanceChanges = transactions.reduce((acc, transaction) => {
+      const change =
+        transaction.type === "EXPENSE"
+          ? transaction.amount
+          : -transaction.amount;
+
+      acc[transaction.accountId] = (acc[transaction.accountId] || 0) + change;
+      return acc;
+    }, {});
+
+    await prisma.$transaction(async (tx) => {
+      await tx.transactions.deleteMany({
+        where: {
+          id: { in: transactionsIds },
+          userId: user.id,
+        },
+      });
+
+      for (const [accountId, balanceChange] of Object.entries(
+        accountBalanceChanges
+      )) {
+        await tx.account.update({
+          where: { id: accountId },
+          data: {
+            balance: {
+              increment: balanceChange,
+            },
+          },
+        });
+      }
+    });
+
+    revalidatePath("/dashboard");
+    revalidatePath("/account/[id]");
+
+    return { succcess: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
 };
